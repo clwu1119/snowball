@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Snowball v15 Dual-Trend</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['"Plus Jakarta Sans"', '"Noto Sans TC"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    colors: {
+                        'luxury-black': '#0F172A',
+                        'luxury-gold': '#D4AF37', 
+                        'trend-blue': '#3B82F6',
+                        'bg-soft': '#F1F5F9',
+                    },
+                    boxShadow: {
+                        'premium': '0 10px 30px -5px rgba(0, 0, 0, 0.1)',
+                        'float': '0 20px 40px -5px rgba(0, 0, 0, 0.15)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; user-select: none; background-color: #F1F5F9; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .safe-pb { padding-bottom: 140px; } 
+        .num-font { font-family: 'JetBrains Mono', monospace; letter-spacing: -0.5px; }
+        .chart-container { position: relative; height: 240px; width: 100%; }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col text-slate-800" x-data="appData()" x-init="initApp()">
+
+    <header class="px-6 pt-12 pb-4 bg-white/90 backdrop-blur-md sticky top-0 z-30 border-b border-slate-200">
+        <div class="flex justify-between items-center">
+            <button @click="toggleLang()" class="flex items-center gap-3 active:scale-95 transition-transform">
+                <div class="w-10 h-10 relative">
+                    <svg viewBox="0 0 100 100" fill="none" class="w-full h-full drop-shadow-md">
+                        <circle cx="50" cy="50" r="48" fill="#0F172A"/>
+                        <path d="M50 20C50 20 75 35 75 50C75 65 60 80 50 80C40 80 25 65 25 50" stroke="#D4AF37" stroke-width="6" stroke-linecap="round"/>
+                        <circle cx="50" cy="50" r="12" fill="#D4AF37"/>
+                    </svg>
+                    <div class="absolute -bottom-1 -right-1 bg-white text-[8px] font-bold px-1 rounded border border-slate-200" x-text="lang === 'zh' ? 'TW' : 'EN'"></div>
+                </div>
+                <div class="text-left">
+                    <h1 class="font-extrabold text-lg tracking-tight text-luxury-black leading-none">SNOWBALL</h1>
+                    <p class="text-[9px] font-bold text-luxury-gold tracking-widest uppercase mt-0.5" x-text="t('subtitle')"></p>
+                </div>
+            </button>
+            
+            <button @click="toggleMode()" class="group relative w-32 h-9 bg-slate-200 rounded-full p-1 flex items-center shadow-inner overflow-hidden">
+                <div class="absolute w-[calc(50%-4px)] h-7 bg-white rounded-full shadow-sm transition-all duration-300 ease-out"
+                     :class="viewMode === 'REAL' ? 'translate-x-0' : 'translate-x-[108%]'"></div>
+                <span class="z-10 w-1/2 text-center text-[10px] font-bold transition-colors duration-300"
+                      :class="viewMode === 'REAL' ? 'text-luxury-black' : 'text-slate-400'">REAL</span>
+                <span class="z-10 w-1/2 text-center text-[10px] font-bold transition-colors duration-300"
+                      :class="viewMode === 'SIM' ? 'text-luxury-black' : 'text-slate-400'">SIM</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto no-scrollbar px-5 pt-6 safe-pb space-y-6">
+        
+        <div x-show="activeTab === 'home'" x-transition:enter="transition ease-out duration-300 opacity-0 translate-y-2">
+            
+            <div class="relative w-full rounded-[2rem] p-6 text-white shadow-2xl shadow-slate-900/20 overflow-hidden bg-luxury-black">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-luxury-gold/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2"></div>
+                <div class="relative z-10">
+                    <div class="flex justify-between items-start">
+                        <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase" x-text="t('total_assets')"></span>
+                        <div class="bg-white/10 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+                            <span class="text-[10px] font-bold text-luxury-gold">XIRR</span>
+                            <span class="text-xs font-bold ml-1 num-font" x-text="stats.roi"></span>
+                        </div>
+                    </div>
+                    <h2 class="text-4xl font-bold mt-2 num-font tracking-tight" x-text="formatMoney(stats.totalAssets)"></h2>
+                    
+                    <div class="grid grid-cols-2 gap-8 border-t border-white/10 pt-4 mt-6">
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-500 uppercase mb-1" x-text="t('invested')"></p>
+                            <p class="font-semibold text-lg num-font" x-text="formatMoney(stats.invested)"></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase mb-1" x-text="t('cash')"></p>
+                            <p class="font-semibold text-lg num-font text-slate-300" x-text="formatMoney(stats.cash)"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-[1.5rem] shadow-premium border border-slate-50">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-bold text-luxury-black px-1" x-text="t('asset_trend')"></h3>
+                    <div class="flex gap-3">
+                        <div class="flex items-center gap-1">
+                            <div class="w-2 h-2 rounded-full bg-luxury-gold"></div>
+                            <span class="text-[9px] text-slate-400 font-bold" x-text="t('legend_principal')"></span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <div class="w-2 h-2 rounded-full bg-trend-blue"></div>
+                            <span class="text-[9px] text-slate-400 font-bold" x-text="t('legend_assets')"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="assetChart"></canvas>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <h3 class="font-bold text-xl text-luxury-black px-1" x-text="t('portfolio')"></h3>
+                <template x-for="stock in portfolio" :key="stock.symbol">
+                    <div class="bg-white p-5 rounded-[1.5rem] shadow-premium border border-white relative overflow-hidden">
+                        <div class="absolute left-0 top-0 bottom-0 w-1.5" :class="stock.pl >= 0 ? 'bg-rose-500' : 'bg-emerald-500'"></div>
+                        <div class="pl-3">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h4 class="font-bold text-lg text-luxury-black tracking-tight" x-text="stock.symbol"></h4>
+                                    <p class="text-xs text-slate-400 mt-0.5 font-medium">
+                                        <span class="num-font text-slate-600" x-text="stock.qty"></span> <span x-text="t('shares')"></span>
+                                    </p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="font-bold text-lg num-font" :class="stock.pl >= 0 ? 'text-rose-500' : 'text-emerald-500'">
+                                        <span x-text="stock.pl >= 0 ? '+' : ''"></span><span x-text="formatMoney(stock.pl)"></span>
+                                    </p>
+                                    <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold mt-1 bg-slate-50" 
+                                          :class="stock.pl >= 0 ? 'text-rose-500' : 'text-emerald-500'">
+                                        <span x-text="stock.pl >= 0 ? '▲' : '▼'"></span> <span x-text="stock.roi + '%'"></span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 bg-slate-50 rounded-xl p-2 border border-slate-100">
+                                <div class="flex-1 pl-2 border-r border-slate-200">
+                                    <p class="text-[9px] text-slate-400 font-bold uppercase" x-text="t('avg_cost')"></p>
+                                    <p class="text-xs font-bold text-slate-600 num-font" x-text="formatMoney(stock.avgPrice)"></p>
+                                </div>
+                                <div class="flex-1 text-right pr-1">
+                                    <p class="text-[9px] text-luxury-gold font-bold uppercase mb-0.5" x-text="t('current_price')"></p>
+                                    <input type="number" x-model="prices[stock.symbol]" @input="savePrices()" class="w-full bg-transparent text-right font-bold text-luxury-black outline-none num-font placeholder-slate-300" placeholder="Input">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="portfolio.length === 0" class="text-center py-10 text-slate-400" x-text="t('no_holdings')"></div>
+            </div>
+        </div>
+
+        <div x-show="activeTab === 'tools'" class="space-y-6" x-cloak>
+            <h2 class="text-2xl font-bold text-luxury-black" x-text="t('toolkit')"></h2>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-premium">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500">
+                        <i class="fas fa-heart-crack"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800" x-text="t('stress_test')"></h3>
+                        <p class="text-[10px] text-slate-400" x-text="t('stress_desc')"></p>
+                    </div>
+                </div>
+                <div class="flex gap-2 mb-4">
+                    <button @click="simStress(-0.1)" class="flex-1 py-3 rounded-xl bg-slate-50 text-xs font-bold hover:bg-rose-50 hover:text-rose-600 transition-colors">-10%</button>
+                    <button @click="simStress(-0.3)" class="flex-1 py-3 rounded-xl bg-slate-50 text-xs font-bold hover:bg-rose-50 hover:text-rose-600 transition-colors">-30%</button>
+                    <button @click="simStress(-0.5)" class="flex-1 py-3 rounded-xl bg-slate-50 text-xs font-bold hover:bg-rose-50 hover:text-rose-600 transition-colors">-50%</button>
+                </div>
+                <div x-show="stressResult.show" class="bg-luxury-black rounded-xl p-4">
+                    <div class="flex justify-between items-end mb-2">
+                        <span class="text-[10px] text-slate-400 uppercase">Stock Value Only</span>
+                        <span class="text-sm font-bold text-slate-300" x-text="formatMoney(stats.stockValue)"></span>
+                    </div>
+                    <div class="h-px bg-white/10 mb-2"></div>
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <p class="text-[10px] text-slate-400 uppercase tracking-widest">After Crash</p>
+                            <p class="text-xl font-bold text-white num-font" x-text="formatMoney(stressResult.value)"></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] text-rose-400 uppercase">Loss</p>
+                            <p class="text-sm font-bold text-rose-400 num-font" x-text="formatMoney(stressResult.loss)"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-premium">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-500">
+                        <i class="fas fa-scale-balanced"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800" x-text="t('rebalance')"></h3>
+                        <p class="text-[10px] text-slate-400" x-text="t('rebalance_desc')"></p>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm font-bold text-slate-600 mb-2">
+                        <span x-text="t('target_stock')"></span>
+                        <span class="text-blue-600" x-text="rebalance.target + '%'"></span>
+                    </div>
+                    <input type="range" min="0" max="100" step="5" x-model="rebalance.target" class="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                </div>
+                <div class="bg-slate-50 rounded-xl p-4">
+                    <div class="flex justify-between text-xs mb-2">
+                        <span class="text-slate-400" x-text="t('current_stock')"></span>
+                        <span class="font-bold" x-text="currentStockRatio + '%'"></span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2 mb-3 overflow-hidden">
+                        <div class="bg-blue-600 h-full transition-all duration-500" :style="'width: ' + currentStockRatio + '%'"></div>
+                    </div>
+                    <p class="text-xs font-bold text-slate-600" x-text="rebalanceSuggestion"></p>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="activeTab === 'calendar'" class="space-y-6" x-cloak>
+            <h2 class="text-2xl font-bold text-luxury-black" x-text="t('dividends')"></h2>
+            
+            <div class="bg-gradient-to-br from-[#D4AF37] to-[#B4941F] rounded-[2rem] p-6 text-white shadow-xl">
+                <p class="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-1" x-text="t('est_annual_income')"></p>
+                <p class="text-3xl font-bold num-font" x-text="formatMoney(totalAnnualDividend)"></p>
+            </div>
+
+            <div class="bg-white rounded-[2rem] p-6 shadow-premium">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-800" x-text="t('rules')"></h3>
+                    <button @click="openDividendModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center"><i class="fas fa-plus text-xs"></i></button>
+                </div>
+                <div class="space-y-2">
+                     <template x-for="(rule, idx) in dividendRules" :key="idx">
+                        <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="w-1 h-8 bg-luxury-gold rounded-full"></div>
+                                <div>
+                                    <p class="font-bold text-slate-800 text-sm" x-text="rule.symbol"></p>
+                                    <p class="text-[10px] text-slate-500"><span x-text="rule.yield"></span>% • <span x-text="rule.months.length"></span> <span x-text="t('times_year')"></span></p>
+                                </div>
+                            </div>
+                            <button @click="removeRule(idx)" class="text-slate-300 hover:text-red-500"><i class="fas fa-times"></i></button>
+                        </div>
+                     </template>
+                     <div x-show="dividendRules.length === 0" class="text-center text-xs text-slate-400 py-2" x-text="t('no_rules')"></div>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <template x-for="(monthData, index) in dividendCalendar" :key="index">
+                    <div class="flex items-center p-3 rounded-xl border transition-all" 
+                         :class="monthData.total > 0 ? 'bg-white border-yellow-200 shadow-sm' : 'border-transparent opacity-50'">
+                        <div class="w-10 text-center font-bold text-xs text-slate-400" x-text="monthData.name"></div>
+                        <div class="flex-1 pl-4 border-l border-slate-200">
+                             <div class="flex justify-between">
+                                <span class="text-sm font-bold text-slate-700 num-font" x-show="monthData.total > 0" x-text="formatMoney(monthData.total)"></span>
+                                <span class="text-xs text-slate-300" x-show="monthData.total === 0">-</span>
+                             </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div x-show="activeTab === 'transactions'" class="space-y-4" x-cloak>
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-luxury-black" x-text="t('history')"></h2>
+                <button @click="resetData()" class="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full border border-rose-100" x-text="t('reset_data')"></button>
+            </div>
+            <div class="space-y-3">
+                <template x-for="tx in filteredTransactions" :key="tx.id">
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg" :class="getIconClass(tx.type)">
+                                <i :class="getIcon(tx.type)"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold text-sm text-slate-800" x-text="tx.symbol ? tx.symbol : t(tx.type.toLowerCase())"></p>
+                                <p class="text-[10px] text-slate-400 num-font" x-text="tx.date"></p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-sm num-font" :class="tx.type === 'DEPOSIT' || tx.type === 'DIVIDEND' ? 'text-emerald-600' : 'text-slate-800'" x-text="formatMoney(tx.totalAmount)"></p>
+                            <p class="text-[10px] text-slate-400" x-show="tx.price > 0">
+                                <span x-text="tx.price"></span> x <span x-text="tx.qty"></span>
+                            </p>
+                        </div>
+                        <button @click="deleteTx(tx.id)" class="ml-2 text-slate-300 hover:text-red-500 p-2"><i class="fas fa-trash text-xs"></i></button>
+                    </div>
+                </template>
+                <div x-show="filteredTransactions.length === 0" class="text-center py-10 text-slate-400 text-xs" x-text="t('no_history')"></div>
+            </div>
+        </div>
+    </main>
+
+    <button @click="openModal()" 
+            x-show="activeTab === 'home' || activeTab === 'transactions'"
+            class="fixed bottom-28 right-6 w-14 h-14 bg-luxury-black text-luxury-gold rounded-full shadow-float flex items-center justify-center text-xl z-40 transition-transform active:scale-90 hover:scale-105 border border-white/10">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <div class="fixed bottom-8 left-6 right-6 z-50">
+        <nav class="bg-white/90 backdrop-blur-xl border border-white/60 rounded-[2rem] shadow-float p-2 flex justify-around items-center h-16">
+            <button @click="activeTab = 'home'" class="flex-1 flex flex-col items-center justify-center h-full rounded-2xl transition-all" 
+                    :class="activeTab === 'home' ? 'text-luxury-black bg-white shadow-sm scale-105' : 'text-slate-400'">
+                <i class="fas fa-chart-pie text-lg"></i>
+                <span class="text-[9px] font-bold mt-1" x-text="t('tab_home')"></span>
+            </button>
+            <button @click="activeTab = 'tools'" class="flex-1 flex flex-col items-center justify-center h-full rounded-2xl transition-all" 
+                    :class="activeTab === 'tools' ? 'text-luxury-black bg-white shadow-sm scale-105' : 'text-slate-400'">
+                <i class="fas fa-layer-group text-lg"></i>
+                <span class="text-[9px] font-bold mt-1" x-text="t('tab_tools')"></span>
+            </button>
+            <button @click="activeTab = 'calendar'" class="flex-1 flex flex-col items-center justify-center h-full rounded-2xl transition-all" 
+                    :class="activeTab === 'calendar' ? 'text-luxury-black bg-white shadow-sm scale-105' : 'text-slate-400'">
+                <i class="fas fa-calendar-check text-lg"></i>
+                <span class="text-[9px] font-bold mt-1" x-text="t('tab_calendar')"></span>
+            </button>
+            <button @click="activeTab = 'transactions'" class="flex-1 flex flex-col items-center justify-center h-full rounded-2xl transition-all" 
+                    :class="activeTab === 'transactions' ? 'text-luxury-black bg-white shadow-sm scale-105' : 'text-slate-400'">
+                <i class="fas fa-list-ul text-lg"></i>
+                <span class="text-[9px] font-bold mt-1" x-text="t('tab_transactions')"></span>
+            </button>
+        </nav>
+    </div>
+
+    <div x-show="isModalOpen" class="fixed inset-0 z-[60] flex items-end justify-center" x-cloak>
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isModalOpen = false" x-transition.opacity></div>
+        <div class="relative bg-[#F8FAFC] w-full max-w-md rounded-t-[2.5rem] p-6 shadow-2xl transform transition-transform border-t border-white/50"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="translate-y-full"
+             x-transition:enter-end="translate-y-0">
+             
+             <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+             
+             <form @submit.prevent="submitForm">
+                <div class="flex p-1 bg-white rounded-2xl shadow-sm border border-slate-100 mb-6">
+                    <template x-for="type in ['BUY', 'DEPOSIT', 'DIVIDEND']">
+                        <button type="button" @click="form.type = type" 
+                                class="flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                                :class="form.type === type ? 'bg-luxury-black text-white shadow-md' : 'text-slate-400 hover:bg-slate-50'">
+                            <span x-text="t(type.toLowerCase())"></span>
+                        </button>
+                    </template>
+                </div>
+
+                <div class="mb-4 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm flex justify-between items-center">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1" x-text="t('date')"></label>
+                    <input type="date" x-model="form.date" class="bg-transparent font-bold text-right outline-none text-slate-700 num-font text-sm">
+                </div>
+
+                <div x-show="form.type === 'BUY'" class="space-y-4 mb-6">
+                    <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1" x-text="t('symbol')"></label>
+                        <input type="text" x-model="form.symbol" placeholder="E.G. 2330" class="w-full bg-transparent text-xl font-bold uppercase outline-none text-luxury-black">
+                    </div>
+                    <div class="flex gap-3">
+                        <div class="flex-1 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1" x-text="t('price')"></label>
+                            <input type="number" step="0.01" x-model="form.price" class="w-full bg-transparent text-lg font-bold outline-none text-right num-font" placeholder="0.0">
+                        </div>
+                        <div class="flex-1 bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1" x-text="t('qty')"></label>
+                            <input type="number" x-model="form.qty" class="w-full bg-transparent text-lg font-bold outline-none text-right num-font" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="form.type !== 'BUY'" class="mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 ml-1" x-text="t('amount')"></label>
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl font-bold text-slate-300">$</span>
+                        <input type="number" x-model="form.amount" class="w-full bg-transparent text-3xl font-bold text-luxury-black outline-none num-font" placeholder="0">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-luxury-black text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all mb-8" x-text="t('save')"></button>
+             </form>
+        </div>
+    </div>
+
+    <div x-show="isDivModalOpen" class="fixed inset-0 z-[60] flex items-end justify-center" x-cloak>
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="isDivModalOpen = false" x-transition.opacity></div>
+        <div class="relative bg-[#F8FAFC] w-full max-w-md rounded-t-[2.5rem] p-6 shadow-2xl transform transition-transform border-t border-white/50"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="translate-y-full"
+             x-transition:enter-end="translate-y-0">
+             
+             <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+             
+             <form @submit.prevent="addDividendRule">
+                 <div class="mb-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1" x-text="t('symbol')"></label>
+                    <input type="text" x-model="divForm.symbol" placeholder="E.G. 2330" class="w-full bg-transparent text-xl font-bold uppercase outline-none text-luxury-black">
+                 </div>
+                 <div class="mb-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1" x-text="t('yield')"></label>
+                    <input type="number" step="0.1" x-model="divForm.yield" placeholder="0.0" class="w-full bg-transparent text-xl font-bold outline-none text-luxury-black num-font">
+                 </div>
+                 
+                 <div class="mb-8">
+                     <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 ml-1" x-text="t('select_months')"></label>
+                     <div class="grid grid-cols-6 gap-2">
+                         <template x-for="m in 12">
+                             <div @click="toggleMonth(m)" 
+                                  class="aspect-square flex items-center justify-center rounded-xl text-sm font-bold cursor-pointer transition-all"
+                                  :class="divForm.months.includes(m) ? 'bg-luxury-black text-white shadow-md' : 'bg-white text-slate-400 border border-slate-100'">
+                                 <span x-text="m"></span>
+                             </div>
+                         </template>
+                     </div>
+                 </div>
+
+                 <button type="submit" class="w-full bg-luxury-black text-white py-4 rounded-2xl font-bold shadow-xl mb-8" x-text="t('save_rule')"></button>
+             </form>
+        </div>
+    </div>
+
+    <script>
+        const i18n = {
+            zh: {
+                subtitle: "私人財富管理",
+                tab_home: "總覽", tab_tools: "工具", tab_calendar: "股息", tab_transactions: "明細",
+                total_assets: "淨資產總值", invested: "總投入本金", cash: "閒置現金",
+                asset_trend: "資產成長趨勢", principal_growth: "累積本金", legend_principal: "投入本金", legend_assets: "資產總值",
+                portfolio: "持股庫存", shares: "股", avg_cost: "均價", current_price: "現價",
+                no_holdings: "尚無持股",
+                toolkit: "決策工具箱",
+                stress_test: "壓力測試", stress_desc: "針對股票市值進行壓力模擬 (不含現金)", projected_value: "崩盤後股票價值",
+                rebalance: "資產再平衡", rebalance_desc: "股債配置建議",
+                target_stock: "目標股票占比", current_stock: "目前占比",
+                suggestion_bal: "✅ 配置平衡", suggestion_sell: "⚠️ 股票過高，建議賣出", suggestion_buy: "🔵 股票偏低，建議加碼",
+                dividends: "股息預估", est_annual_income: "預估年領股息", rules: "配息規則", no_rules: "尚未設定規則",
+                select_months: "選擇配息月份", times_year: "次/年",
+                history: "交易紀錄", reset_data: "重置", no_history: "尚無交易",
+                buy: "買入", deposit: "入金", dividend: "股息",
+                date: "日期", symbol: "代號", price: "單價", qty: "股數", amount: "金額",
+                save: "儲存紀錄", save_rule: "儲存規則",
+                yield: "殖利率 %"
+            },
+            en: {
+                subtitle: "PRIVATE WEALTH",
+                tab_home: "Home", tab_tools: "Tools", tab_calendar: "Divs", tab_transactions: "History",
+                total_assets: "NET WORTH", invested: "Invested", cash: "Cash",
+                asset_trend: "Asset Growth", principal_growth: "Principal", legend_principal: "Principal", legend_assets: "Total Assets",
+                portfolio: "Portfolio", shares: "Shares", avg_cost: "Avg", current_price: "Price",
+                no_holdings: "No Holdings",
+                toolkit: "Toolkit",
+                stress_test: "Stress Test", stress_desc: "Simulate market crash on Stock holdings", projected_value: "Post-Crash Value",
+                rebalance: "Rebalancing", rebalance_desc: "Asset Allocation",
+                target_stock: "Target Stock %", current_stock: "Current %",
+                suggestion_bal: "✅ Balanced", suggestion_sell: "⚠️ High Stock % (Sell)", suggestion_buy: "🔵 Low Stock % (Buy)",
+                dividends: "Dividends", est_annual_income: "Est. Annual Income", rules: "Rules", no_rules: "No Rules Set",
+                select_months: "Select Payout Months", times_year: "x / Year",
+                history: "History", reset_data: "Reset", no_history: "No History",
+                buy: "Buy", deposit: "Deposit", dividend: "Dividend",
+                date: "Date", symbol: "Symbol", price: "Price", qty: "Qty", amount: "Amount",
+                save: "Save Record", save_rule: "Save Rule",
+                yield: "Yield %"
+            }
+        };
+
+        function appData() {
+            return {
+                lang: 'zh',
+                viewMode: 'REAL',
+                activeTab: 'home',
+                transactions: [],
+                prices: {}, 
+                dividendRules: [],
+                
+                isModalOpen: false,
+                isDivModalOpen: false,
+                chartInstance: null,
+                
+                form: { date: new Date().toISOString().split('T')[0], type: 'BUY', symbol: '', price: '', qty: '', amount: '', note: '' },
+                divForm: { symbol: '', yield: '', months: [] },
+                rebalance: { target: 80 },
+                stressResult: { show: false, value: 0, loss: 0 },
+
+                initApp() {
+                    const savedTx = localStorage.getItem('snowball_v15_tx');
+                    const savedPrices = localStorage.getItem('snowball_v15_prices');
+                    const savedRules = localStorage.getItem('snowball_v15_rules');
+                    const savedLang = localStorage.getItem('snowball_v15_lang');
+
+                    if (savedLang) this.lang = savedLang;
+                    
+                    if (savedTx) {
+                        this.transactions = JSON.parse(savedTx);
+                    } else {
+                        this.transactions = [
+                            { id: 1, date: '2023-01-01', type: 'DEPOSIT', totalAmount: 500000, isSimulation: false },
+                            { id: 2, date: '2023-02-15', type: 'BUY', symbol: '2330', price: 500, qty: 500, totalAmount: 250000, isSimulation: false },
+                            { id: 3, date: '2023-06-01', type: 'DEPOSIT', totalAmount: 200000, isSimulation: false },
+                            { id: 4, date: '2024-01-10', type: 'BUY', symbol: '00878', price: 20, qty: 10000, totalAmount: 200000, isSimulation: false }
+                        ];
+                        this.prices = { '2330': 580, '00878': 22.5 };
+                        this.save();
+                        this.savePrices();
+                    }
+                    if (savedPrices) this.prices = JSON.parse(savedPrices);
+                    if (savedRules) this.dividendRules = JSON.parse(savedRules);
+
+                    // Defer chart
+                    setTimeout(() => this.renderChart(), 300);
+                    
+                    this.$watch('transactions', () => this.renderChart());
+                    this.$watch('prices', () => this.renderChart());
+                    this.$watch('viewMode', () => this.renderChart());
+                },
+
+                t(key) { return i18n[this.lang][key] || key; },
+                toggleLang() { this.lang = this.lang === 'zh' ? 'en' : 'zh'; localStorage.setItem('snowball_v15_lang', this.lang); },
+
+                get filteredTransactions() {
+                    return this.transactions
+                        .filter(t => t.isSimulation === (this.viewMode === 'SIM'))
+                        .sort((a,b) => new Date(a.date) - new Date(b.date));
+                },
+
+                // 雙線圖核心邏輯 (Dual-Trend Engine)
+                renderChart() {
+                    if (this.activeTab !== 'home') return;
+                    const ctx = document.getElementById('assetChart');
+                    if(!ctx) return;
+
+                    let txs = [...this.filteredTransactions].sort((a,b) => new Date(a.date) - new Date(b.date));
+                    if(txs.length === 0) return;
+
+                    let startDate = new Date(txs[0].date);
+                    let endDate = new Date();
+                    let dateArray = [];
+                    let principalData = []; // 本金線
+                    let assetData = []; // 資產線
+
+                    let runningInvested = 0; // 累積本金
+                    let runningDividends = 0; // 累積股息 (已實現)
+                    
+                    // 計算今日總資產 (目標點)
+                    let currentTotalAssets = this.stats.totalAssets;
+                    let currentTotalInvested = this.stats.invested;
+                    
+                    // 簡單模擬：資產線 = 本金 + (未實現損益 * 時間權重)
+                    // 這樣可以畫出一條從「成本」平滑過渡到「今日市值」的曲線
+                    let totalUnrealizedPL = currentTotalAssets - currentTotalInvested;
+                    let totalDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+
+                    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+                        let dateStr = d.toISOString().split('T')[0];
+                        
+                        // 更新當日累積本金
+                        let dayTxs = txs.filter(t => t.date === dateStr);
+                        dayTxs.forEach(t => {
+                            if(t.type === 'DEPOSIT') runningInvested += t.totalAmount;
+                            if(t.type === 'DIVIDEND') runningDividends += t.totalAmount;
+                        });
+
+                        dateArray.push(dateStr);
+                        principalData.push(runningInvested);
+
+                        // 計算模擬資產值 (智能補間)
+                        // Progress 0~1
+                        let daysPassed = (d - startDate) / (1000 * 60 * 60 * 24);
+                        let progress = totalDays > 0 ? daysPassed / totalDays : 1;
+                        
+                        // 資產 = 本金 + 累積股息 + (總未實現損益 * 進度)
+                        let simulatedAsset = runningInvested + runningDividends + (totalUnrealizedPL * progress);
+                        assetData.push(simulatedAsset);
+                    }
+
+                    if(this.chartInstance) this.chartInstance.destroy();
+
+                    this.chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dateArray,
+                            datasets: [
+                                {
+                                    label: this.t('legend_assets'),
+                                    data: assetData,
+                                    borderColor: '#3B82F6', // Blue
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    fill: true,
+                                    borderWidth: 2,
+                                    pointRadius: 0,
+                                    tension: 0.4
+                                },
+                                {
+                                    label: this.t('legend_principal'),
+                                    data: principalData,
+                                    borderColor: '#D4AF37', // Gold
+                                    borderDash: [5, 5], // 虛線
+                                    backgroundColor: 'transparent',
+                                    pointRadius: 0,
+                                    borderWidth: 2,
+                                    tension: 0.1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { intersect: false, mode: 'index' },
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { display: false },
+                                y: { display: false } 
+                            }
+                        }
+                    });
+                },
+
+                get portfolio() {
+                    let holdings = {};
+                    this.filteredTransactions.forEach(tx => {
+                        if (tx.type === 'BUY' && tx.symbol) {
+                            let s = tx.symbol.toUpperCase();
+                            if (!holdings[s]) holdings[s] = { qty: 0, totalCost: 0 };
+                            holdings[s].qty += parseFloat(tx.qty) || 0;
+                            holdings[s].totalCost += parseFloat(tx.totalAmount) || 0;
+                        }
+                    });
+                    return Object.keys(holdings).map(symbol => {
+                        let h = holdings[symbol];
+                        let avgPrice = h.qty > 0 ? h.totalCost / h.qty : 0;
+                        let curPrice = parseFloat(this.prices[symbol]) || avgPrice; 
+                        let marketValue = h.qty * curPrice;
+                        let pl = marketValue - h.totalCost;
+                        let roi = h.totalCost > 0 ? (pl / h.totalCost * 100).toFixed(1) : 0;
+                        return { symbol, qty: h.qty, cost: h.totalCost, avgPrice, marketValue, pl, roi };
+                    });
+                },
+
+                get stats() {
+                    let invested = 0, spent = 0, dividends = 0;
+                    this.filteredTransactions.forEach(t => {
+                        let amt = parseFloat(t.totalAmount) || 0;
+                        if (t.type === 'DEPOSIT') invested += amt;
+                        if (t.type === 'BUY') spent += amt;
+                        if (t.type === 'DIVIDEND') dividends += amt;
+                    });
+                    let cash = invested - spent + dividends;
+                    let stockValue = this.portfolio.reduce((sum, p) => sum + p.marketValue, 0);
+                    let totalAssets = cash + stockValue;
+                    let roi = invested > 0 ? ((totalAssets - invested) / invested * 100).toFixed(2) + '%' : '0.00%';
+                    return { invested, cash, stockValue, totalAssets, roi };
+                },
+
+                get dividendCalendar() {
+                    let months = this.lang === 'zh' ? 
+                        ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'] : 
+                        ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+                    
+                    let cal = months.map(m => ({ name: m, total: 0 }));
+                    this.portfolio.forEach(p => {
+                        let rule = this.dividendRules.find(r => r.symbol === p.symbol);
+                        if (rule && rule.months.length > 0) {
+                            let annual = p.marketValue * (parseFloat(rule.yield) / 100);
+                            let perMonth = annual / rule.months.length;
+                            rule.months.forEach(m => {
+                                if(cal[m-1]) cal[m-1].total += perMonth;
+                            });
+                        }
+                    });
+                    return cal;
+                },
+                get totalAnnualDividend() { return this.dividendCalendar.reduce((s, m) => s + m.total, 0); },
+
+                simStress(p) { 
+                    let v = this.stats.stockValue; 
+                    this.stressResult.value = v * (1 + p); 
+                    this.stressResult.loss = v * Math.abs(p); 
+                    this.stressResult.show = true; 
+                },
+
+                toggleMonth(m) {
+                    if(this.divForm.months.includes(m)) this.divForm.months = this.divForm.months.filter(x => x !== m);
+                    else this.divForm.months.push(m);
+                },
+
+                submitForm() {
+                    let newTx = { id: Date.now(), date: this.form.date, type: this.form.type, isSimulation: (this.viewMode === 'SIM') };
+                    if (this.form.type === 'BUY') {
+                        newTx.symbol = this.form.symbol.toUpperCase();
+                        newTx.price = parseFloat(this.form.price);
+                        newTx.qty = parseFloat(this.form.qty);
+                        newTx.totalAmount = newTx.price * newTx.qty;
+                    } else {
+                        newTx.totalAmount = parseFloat(this.form.amount);
+                    }
+                    this.transactions.push(newTx);
+                    this.save();
+                    this.isModalOpen = false;
+                    this.form.symbol=''; this.form.price=''; this.form.qty=''; this.form.amount='';
+                },
+
+                addDividendRule() {
+                    this.dividendRules.push({...this.divForm, symbol: this.divForm.symbol.toUpperCase()});
+                    this.saveRules();
+                    this.isDivModalOpen = false;
+                    this.divForm = { symbol: '', yield: '', months: [] };
+                },
+                removeRule(i) { this.dividendRules.splice(i,1); this.saveRules(); },
+                deleteTx(id) { if(confirm('Delete?')) { this.transactions = this.transactions.filter(t=>t.id!==id); this.save(); }},
+                resetData() { if(confirm('Reset all?')) { localStorage.clear(); location.reload(); }},
+                
+                save() { localStorage.setItem('snowball_v15_tx', JSON.stringify(this.transactions)); },
+                savePrices() { localStorage.setItem('snowball_v15_prices', JSON.stringify(this.prices)); },
+                saveRules() { localStorage.setItem('snowball_v15_rules', JSON.stringify(this.dividendRules)); },
+                toggleMode() { this.viewMode = this.viewMode==='REAL'?'SIM':'REAL'; },
+                openModal() { this.isModalOpen = true; },
+                openDividendModal() { this.isDivModalOpen = true; this.divForm.months = []; },
+                formatMoney(n) { return '$' + Math.floor(n).toLocaleString(); },
+                t(key) { return i18n[this.lang][key] || key; },
+                getIconClass(t) { return {'DEPOSIT':'bg-emerald-100 text-emerald-600', 'BUY':'bg-luxury-black text-white', 'DIVIDEND':'bg-luxury-gold text-white'}[t]; },
+                getIcon(t) { return {'DEPOSIT':'fa-arrow-down', 'BUY':'fa-briefcase', 'DIVIDEND':'fa-coins'}[t]; },
+                getTabIcon(t) { return {'home':'fa-chart-pie', 'tools':'fa-layer-group', 'calendar':'fa-calendar-check', 'transactions':'fa-list-ul'}[t]; }
+            }
+        }
+    </script>
+</body>
+</html>
